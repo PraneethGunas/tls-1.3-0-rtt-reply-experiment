@@ -1,223 +1,110 @@
-<p align="center">
-  <img width="460" height="300" src="https://raw.githubusercontent.com/rustls/rustls/main/admin/rustls-logo-web.png">
-</p>
+```markdown
+# TLS 1.3 0-RTT Replay Attack Demonstration
 
-<p align="center">
-Rustls is a modern TLS library written in Rust.
-</p>
+This repository demonstrates the vulnerability of **TLS 1.3 0-RTT** to replay attacks, using a forked implementation of the [Rustls](https://github.com/rustls/rustls) library. The project includes a custom server implementation, packet sniffing, and replay attack simulation tools.
 
-# Status
+---
 
-Rustls is used in production at many organizations and projects. We aim to maintain
-reasonable API surface stability but the API may evolve as we make changes to accommodate
-new features or performance improvements.
+## Features
+1. A custom **Rustls**-based TLS 1.3 server with support for 0-RTT.
+2. Packet sniffing to analyze client-server communication.
+3. Replay attack simulation to exploit 0-RTT early data.
 
-We have a [roadmap](ROADMAP.md) for our future plans. We also have [benchmarks](BENCHMARKING.md) to
-prevent performance regressions and to let you evaluate rustls on your target hardware.
+---
 
-If you'd like to help out, please see [CONTRIBUTING.md](CONTRIBUTING.md).
+## Prerequisites
 
-[![Build Status](https://github.com/rustls/rustls/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/rustls/rustls/actions/workflows/build.yml?query=branch%3Amain)
-[![Coverage Status (codecov.io)](https://codecov.io/gh/rustls/rustls/branch/main/graph/badge.svg)](https://codecov.io/gh/rustls/rustls/)
-[![Documentation](https://docs.rs/rustls/badge.svg)](https://docs.rs/rustls/)
-[![Chat](https://img.shields.io/discord/976380008299917365?logo=discord)](https://discord.gg/MCSB76RU96)
-[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/9034/badge)](https://www.bestpractices.dev/projects/9034)
+1. **Install Rust and Cargo**:
+   Follow instructions [here](https://www.rust-lang.org/tools/install).
 
-## Changelog
+2. **Install OpenSSL**:
+   On Ubuntu/Debian:
+   ```bash
+   sudo apt update
+   sudo apt install openssl
+   ```
 
-The detailed list of changes in each release can be found at
-https://github.com/rustls/rustls/releases.
+3. **Install Python and Dependencies**:
+   Ensure Python 3 is installed. Install necessary packages:
+   ```bash
+   pip install scapy
+   ```
 
-# Documentation
+4. **Generate Certificates**:
+   Generate a self-signed certificate for the server:
+   ```bash
+   openssl req -x509 -newkey rsa:2048 -keyout server.key -out server.crt -days 365 -nodes
+   ```
+   When prompted, set `Common Name (CN)` to `localhost`.
 
-https://docs.rs/rustls/
+---
 
-# Approach
+## Project Structure
+- **`rustls/`**: The forked Rustls repository containing the TLS server implementation.
+- **`sniff_session.py`**: Python script to sniff packets during client-server communication.
+- **`reply0rtt.py`**: Python script to replay captured 0-RTT packets.
 
-Rustls is a TLS library that aims to provide a good level of cryptographic security,
-requires no configuration to achieve that security, and provides no unsafe features or
-obsolete cryptography by default.
+---
 
-Rustls implements TLS1.2 and TLS1.3 for both clients and servers. See [the full
-list of protocol features](https://docs.rs/rustls/latest/rustls/manual/_04_features/index.html).
+## Running the Project
 
-### Platform support
-
-While Rustls itself is platform independent, by default it uses [`aws-lc-rs`] for implementing
-the cryptography in TLS.  See [the aws-lc-rs FAQ][aws-lc-rs-platforms-faq] for more details of the
-platform/architecture support constraints in aws-lc-rs.
-
-[`ring`] is also available via the `ring` crate feature: see
-[the supported `ring` target platforms][ring-target-platforms].
-
-By providing a custom instance of the [`crypto::CryptoProvider`] struct, you
-can replace all cryptography dependencies of rustls.  This is a route to being portable
-to a wider set of architectures and environments, or compliance requirements.  See the
-[`crypto::CryptoProvider`] documentation for more details.
-
-Specifying `default-features = false` when depending on rustls will remove the
-dependency on aws-lc-rs.
-
-Rustls requires Rust 1.63 or later. It has an optional dependency on zlib-rs which requires 1.75 or later.
-
-[ring-target-platforms]: https://github.com/briansmith/ring/blob/2e8363b433fa3b3962c877d9ed2e9145612f3160/include/ring-core/target.h#L18-L64
-[`crypto::CryptoProvider`]: https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html
-[`ring`]: https://crates.io/crates/ring
-[aws-lc-rs-platforms-faq]: https://aws.github.io/aws-lc-rs/faq.html#can-i-run-aws-lc-rs-on-x-platform-or-architecture
-[`aws-lc-rs`]: https://crates.io/crates/aws-lc-rs
-
-### Cryptography providers
-
-Since Rustls 0.22 it has been possible to choose the provider of the cryptographic primitives
-that Rustls uses. This may be appealing if you have specific platform, compliance or feature
-requirements that aren't met by the default provider, [`aws-lc-rs`].
-
-Users that wish to customize the provider in use can do so when constructing `ClientConfig`
-and `ServerConfig` instances using the `with_crypto_provider` method on the respective config
-builder types. See the [`crypto::CryptoProvider`] documentation for more details.
-
-#### Built-in providers
-
-Rustls ships with two built-in providers controlled with associated feature flags:
-
-* [`aws-lc-rs`] - enabled by default, available with the `aws_lc_rs` feature flag enabled.
-* [`ring`] - available with the `ring` feature flag enabled.
-
-See the documentation for [`crypto::CryptoProvider`] for details on how providers are
-selected.
-
-#### Third-party providers
-
-The community has also started developing third-party providers for Rustls:
-
-* [`rustls-mbedtls-provider`] - a provider that uses [`mbedtls`] for cryptography.
-* [`rustls-openssl`] - a provider that uses [OpenSSL] for cryptography.
-* [`rustls-post-quantum`]: an experimental provider that adds support for post-quantum
-key exchange to the default aws-lc-rs provider.
-* [`boring-rustls-provider`] - a work-in-progress provider that uses [`boringssl`] for
-cryptography.
-* [`rustls-rustcrypto`] - an experimental provider that uses the crypto primitives
-from [`RustCrypto`] for cryptography.
-* [`rustls-symcrypt`] - a provider that uses Microsoft's [SymCrypt] library.
-* [`rustls-wolfcrypt-provider`] - a work-in-progress provider that uses [`wolfCrypt`] for cryptography.
-
-[`rustls-mbedtls-provider`]: https://github.com/fortanix/rustls-mbedtls-provider
-[`mbedtls`]: https://github.com/Mbed-TLS/mbedtls
-[`rustls-openssl`]: https://github.com/tofay/rustls-openssl
-[OpenSSL]: https://openssl-library.org/
-[`rustls-symcrypt`]: https://github.com/microsoft/rustls-symcrypt
-[SymCrypt]: https://github.com/microsoft/SymCrypt
-[`boring-rustls-provider`]: https://github.com/janrueth/boring-rustls-provider
-[`boringssl`]: https://github.com/google/boringssl
-[`rustls-rustcrypto`]: https://github.com/RustCrypto/rustls-rustcrypto
-[`RustCrypto`]: https://github.com/RustCrypto
-[`rustls-post-quantum`]: https://crates.io/crates/rustls-post-quantum
-[`rustls-wolfcrypt-provider`]: https://github.com/wolfSSL/rustls-wolfcrypt-provider
-[`wolfCrypt`]: https://www.wolfssl.com/products/wolfcrypt
-
-#### Custom provider
-
-We also provide a simple example of writing your own provider in the [`custom-provider`]
-example. This example implements a minimal provider using parts of the [`RustCrypto`]
-ecosystem.
-
-See the [Making a custom CryptoProvider] section of the documentation for more information
-on this topic.
-
-[`custom-provider`]: https://github.com/rustls/rustls/tree/main/provider-example/
-[`RustCrypto`]: https://github.com/RustCrypto
-[Making a custom CryptoProvider]: https://docs.rs/rustls/latest/rustls/crypto/struct.CryptoProvider.html#making-a-custom-cryptoprovider
-
-# Example code
-
-Our [examples] directory contains demos that show how to handle I/O using the
-[`stream::Stream`] helper, as well as more complex asynchronous I/O using [`mio`].
-If you're already using Tokio for an async runtime you may prefer to use
-[`tokio-rustls`] instead of interacting with rustls directly.
-
-The [`mio`] based examples are the most complete, and discussed below. Users
-new to Rustls may prefer to look at the simple client/server examples before
-diving in to the more complex MIO examples.
-
-[examples]: examples/
-[`stream::Stream`]: https://docs.rs/rustls/latest/rustls/struct.Stream.html
-[`mio`]: https://docs.rs/mio/latest/mio/
-[`tokio-rustls`]: https://docs.rs/tokio-rustls/latest/tokio_rustls/
-
-## Client example program
-
-The MIO client example program is named `tlsclient-mio`.
-
-Some sample runs:
-
-```
-$ cargo run --bin tlsclient-mio -- --http mozilla-modern.badssl.com
-HTTP/1.1 200 OK
-Server: nginx/1.6.2 (Ubuntu)
-Date: Wed, 01 Jun 2016 18:44:00 GMT
-Content-Type: text/html
-Content-Length: 644
-(...)
+### 1. Start the Server
+Run the TLS 1.3 server:
+```bash
+cargo run --bin simple_0rtt_server --package rustls-examples server.crt server.key
 ```
 
-or
-
-```
-$ cargo run --bin tlsclient-mio -- --http expired.badssl.com
-TLS error: InvalidCertificate(Expired)
-Connection closed
+### 2. Packet Sniffing
+Capture packets during client-server communication:
+```bash
+sudo python sniff_session.py
 ```
 
-Run `cargo run --bin tlsclient-mio -- --help` for more options.
-
-## Server example program
-
-The MIO server example program is named `tlsserver-mio`.
-
-Here's a sample run; we start a TLS echo server, then connect to it with
-`openssl` and `tlsclient-mio`:
-
-```
-$ cargo run --bin tlsserver-mio -- --certs test-ca/rsa-2048/end.fullchain --key test-ca/rsa-2048/end.key -p 8443 echo &
-$ echo hello world | openssl s_client -ign_eof -quiet -connect localhost:8443
-depth=2 CN = ponytown RSA CA
-verify error:num=19:self signed certificate in certificate chain
-hello world
-^C
-$ echo hello world | cargo run --bin tlsclient-mio -- --cafile test-ca/rsa-2048/ca.cert -p 8443 localhost
-hello world
-^C
+### 3. Client Requests and Session Resumption
+#### Initial Client Request
+Use OpenSSL to initiate a connection and save the session:
+```bash
+openssl s_client -connect localhost:4443 -sess_out sess.pem
 ```
 
-Run `cargo run --bin tlsserver-mio -- --help` for more options.
+#### Session Resumption with 0-RTT Data
+To resume the session and send early data:
+1. Create a file `early.txt` containing the early data to send.
+2. Execute the following:
+   ```bash
+   openssl s_client -connect localhost:4443 -sess_in sess.pem -early_data early.txt
+   ```
 
-# License
+### 4. Replay Attack
+Replay the captured **ClientHello** message and simulate a 0-RTT attack:
+```bash
+python reply0rtt.py
+```
 
-Rustls is distributed under the following three licenses:
+---
 
-- Apache License version 2.0.
-- MIT license.
-- ISC license.
+## Expected Results
+1. **Packet Sniffing**:
+   - Inspect captured packets to confirm session establishment, resumption, and 0-RTT data transmission.
+2. **Replay Attack**:
+   - Observe the server processing replayed 0-RTT data, highlighting the vulnerability.
 
-These are included as LICENSE-APACHE, LICENSE-MIT and LICENSE-ISC
-respectively.  You may use this software under the terms of any
-of these licenses, at your option.
+---
 
-# Project Membership
+## Notes
+- **Replay Vulnerability**:
+  This demonstration highlights the lack of inherent replay protection in 0-RTT early data and the risks in unsynchronized distributed systems.
+- **Use in Controlled Environments**:
+  Ensure that this setup is used strictly for research and testing purposes in a controlled environment.
 
-- Joe Birr-Pixton ([@ctz], Project Founder - full-time funded by [Prossimo])
-- Dirkjan Ochtman ([@djc], Co-maintainer)
-- Daniel McCarney ([@cpu], Co-maintainer - half-time funded by [Prossimo])
-- Josh Aas ([@bdaehlie], Project Management)
+---
 
-[@ctz]: https://github.com/ctz
-[@djc]: https://github.com/djc
-[@cpu]: https://github.com/cpu
-[@bdaehlie]: https://github.com/bdaehlie
-[Prossimo]: https://www.memorysafety.org/initiative/rustls/
+## References
+- [Rustls Documentation](https://github.com/rustls/rustls)
+- [TLS 1.3 Specification (RFC 8446)](https://www.rfc-editor.org/rfc/rfc8446.html)
 
-# Code of conduct
+---
 
-This project adopts the [Rust Code of Conduct](https://www.rust-lang.org/policies/code-of-conduct).
-Please email rustls-mod@googlegroups.com to report any instance of misconduct, or if you
-have any comments or questions on the Code of Conduct.
+## License
+This project is licensed under the terms of the original Rustls repository.
+```
