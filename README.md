@@ -1,4 +1,3 @@
-```markdown
 # TLS 1.3 0-RTT Replay Attack Demonstration
 
 This repository demonstrates the vulnerability of **TLS 1.3 0-RTT** to replay attacks, using a forked implementation of the [Rustls](https://github.com/rustls/rustls) library. The project includes a custom server implementation, packet sniffing, and replay attack simulation tools.
